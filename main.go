@@ -53,27 +53,28 @@ func setupRouter(client pulsar.Client) *gin.Engine {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to read request body"})
 			return
 		}
-		producer, ok := cachedProducers[tenant+"/"+namespace+"/"+name]
+		topic := getIntermediateTopic(tenant, namespace, name)
+		producer, ok := cachedProducers[topic]
 		if !ok {
 			sender := make(chan bool, 1)
-			createSignal <- createProducerMessage{topic: getIntermediateTopic(tenant, namespace, name), sender: sender}
+			createSignal <- createProducerMessage{topic: topic, sender: sender}
 			created := <-sender // wait producer to be created
 			if !created {
 				c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create producer"})
 				return
 			}
-			producer = cachedProducers[tenant+"/"+namespace+"/"+name]
+			producer = cachedProducers[topic]
 		}
 		sender := make(chan string, 1)
 		producer.Send(&pulsar2.Message{
 			Message: &pulsar.ProducerMessage{
-				Value: jsonData,
+				Payload: jsonData,
 			},
 			Sender: sender,
 		})
 		select {
 		case result := <-sender:
-			c.JSON(http.StatusOK, result)
+			c.String(http.StatusOK, result)
 		case <-time.After(60 * time.Second):
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "timeout to wait for response"})
 		}
@@ -87,6 +88,7 @@ func main() {
 	var pulsarURL string
 	flag.StringVar(&listenAddr, "listen-addr", ":8080", "listen address")
 	flag.StringVar(&pulsarURL, "pulsar-url", "pulsar://localhost:6650", "pulsar url")
+	flag.Parse()
 
 	conf := pulsar.ClientOptions{URL: pulsarURL}
 	client, _ := pulsar.NewClient(conf)

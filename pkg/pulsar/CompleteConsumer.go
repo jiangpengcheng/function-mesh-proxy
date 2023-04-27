@@ -22,11 +22,13 @@ func NewCompleteConsumer(client pulsar.Client) (*CompleteConsumer, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CompleteConsumer{
+	res := &CompleteConsumer{
 		consumer:       consumer,
 		messageChannel: channel,
 		listeners:      make(map[string]chan string),
-	}, nil
+	}
+	go res.watch()
+	return res, nil
 }
 
 func (c *CompleteConsumer) watch() {
