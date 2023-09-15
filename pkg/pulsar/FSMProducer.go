@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/gogo/protobuf/proto"
+	"log"
 	"time"
 )
 
@@ -98,7 +99,7 @@ func (f *FSMProducer) watch() {
 				} else {
 					f.handleMessage(msg)
 				}
-			case <-time.After(5 * time.Second):
+			case <-time.After(60 * time.Second):
 				f.closeProducer()
 				f.goTo(Idle)
 			}
@@ -134,7 +135,8 @@ func (f *FSMProducer) handleMessage(msg *Message) {
 		if err != nil {
 			f.handleError(msg.Sender, err)
 		} else {
-			msgId := base64.StdEncoding.EncodeToString(data)
+			msgId := base64.URLEncoding.EncodeToString(data)
+			log.Printf("Message sent: %s to topic: %s",  msgId, f.topic)
 			f.consumer.RegisterListener(msgId, msg.Sender)
 		}
 	})
